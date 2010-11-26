@@ -120,6 +120,7 @@
     this.set(attributes, {silent : true});
     this._previousAttributes = _.clone(this.attributes);
     if (options && options.collection) this.collection = options.collection;
+    if(options && options.modelName) this.modelName = options.modelName;
     this.initialize(attributes, options);
   };
 
@@ -894,8 +895,20 @@
   // it difficult to read the body of `PUT` requests.
   Backbone.sync = function(method, model, success, error) {
     var type = methodMap[method];
-    var modelJSON = (method === 'create' || method === 'update') ?
-                    JSON.stringify(model.toJSON()) : null;
+    var modelJSON;
+    if(method === 'create' || method === 'update') {
+      // support having the root node be the model name, which works better with Rails
+      var json;
+      if(model.modelName) {
+          json = {};
+          json[model.modelName] = model.toJSON();
+      } else
+        json = model.toJSON();
+
+      modelJSON = JSON.stringify(json);
+    } else {
+      modelJSON = null;
+    }
 
     // Default JSON-request options.
     var params = {
