@@ -130,6 +130,10 @@
     // A snapshot of the model's previous attributes, taken immediately
     // after the last `"change"` event was fired.
     _previousAttributes : null,
+    
+    // A snapshot of the model's previously saved attributes, taken immediately
+    // after the last save call
+    _previousSavedAttributes: null,
 
     // Has the item been changed since the last `"change"` event?
     _changed : false,
@@ -244,16 +248,31 @@
     // state will be `set` again.
     save : function(attrs, options) {
       options || (options = {});
-      if (attrs && !this.set(attrs, options)) return false;
-      var model = this;
-      var success = function(resp) {
-        if (!model.set(model.parse(resp), options)) return false;
-        if (options.success) options.success(model, resp);
-      };
-      var error = options.error && _.bind(options.error, null, model);
-      var method = this.isNew() ? 'create' : 'update';
-      (this.sync || Backbone.sync)(method, this, success, error);
+      
+      if( !options.cached || (options.cached && this.savedAttributesHasChanged()) ) {
+          if (attrs && !this.set(attrs, options)) return false;
+          var model = this;
+          var success = function(resp) {
+            if (!model.set(model.parse(resp), options)) return false;
+            model._previousSavedAttributes = _.clone(model.attributes);
+            if (options.success) options.success(model, resp);
+          };
+          var error = options.error && _.bind(options.error, null, model);
+          var method = this.isNew() ? 'create' : 'update';
+          (this.sync || Backbone.sync)(method, this, success, error);
+      } else {
+          return false;
+      }
       return this;
+    },
+    
+    savedAttributesHasChanged: function() {
+        if(!this._previousSavedAttributes) return true;
+        for(var key in this.attributes)
+            if(this._previousSavedAttributes[key] !==  this.attributes[key])
+                return true;
+
+        return false;
     },
 
     // Destroy this model on the server. Upon success, the model is removed
