@@ -120,7 +120,6 @@
     this.set(attributes, {silent : true});
     this._previousAttributes = _.clone(this.attributes);
     if (options && options.collection) this.collection = options.collection;
-    if(options && options.modelName) this.modelName = options.modelName;
     this.initialize(attributes, options);
   };
 
@@ -235,7 +234,8 @@
       options || (options = {});
       var model = this;
       var success = function(resp) {
-        if (!model.set(model.parse(resp), options)) return false;
+        var attrs = model.name ? resp[model.name] : resp;
+        if (!model.set(model.parse(attrs), options)) return false;
         if (options.success) options.success(model, resp);
       };
       var error = options.error && _.bind(options.error, null, model);
@@ -253,9 +253,15 @@
           if (attrs && !this.set(attrs, options)) return false;
           var model = this;
           var success = function(resp) {
-            if (!model.set(model.parse(resp), options)) return false;
-            model._previousSavedAttributes = _.clone(model.attributes);
-            if (options.success) options.success(model, resp);
+            if (resp.error) {
+              // there was a data error
+              if(options.errorData) options.errorData(model, resp.error);
+            } else {
+              var attrs = model.name ? resp[model.name] : resp;
+              if (!model.set(model.parse(attrs), options)) return false;
+              model._previousSavedAttributes = _.clone(model.attributes);
+              if (options.success) options.success(model, resp);
+            }
           };
           var error = options.error && _.bind(options.error, null, model);
           var method = this.isNew() ? 'create' : 'update';
@@ -918,12 +924,12 @@
     if(method === 'create' || method === 'update') {
       // support having the root node be the model name, which works better with Rails
       var json;
-      if(model.modelName) {
-          json = {};
-          json[model.modelName] = model.toJSON();
-      } else
+      if(model.name) {
+        json = {};
+        json[model.name] = model.toJSON();
+      } else {
         json = model.toJSON();
-
+      }
       modelJSON = JSON.stringify(json);
     } else {
       modelJSON = null;
